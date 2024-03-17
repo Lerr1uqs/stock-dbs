@@ -4,12 +4,13 @@ import sys
 import os
 import pandas as pd
 import tushare as ts
+from utils import *
 
-TOEKN_PATH = os.path.expanduser("~/.tushare.token")
-with open(TOEKN_PATH, "r") as f:
-    token = f.read().strip()
-    ts.set_token(token)
-    pro = ts.pro_api()
+# TOEKN_PATH = os.path.expanduser("~/.tushare.token")
+# with open(TOEKN_PATH, "r") as f:
+#     token = f.read().strip()
+#     ts.set_token(token)
+#     pro = ts.pro_api()
 
 df: pd.DataFrame = ts.pro_bar(ts_code='000001.SZ', adj='hfq', start_date='20180101', end_date='20181011')
 

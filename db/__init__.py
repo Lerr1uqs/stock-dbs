@@ -43,7 +43,6 @@ def query_from_tushare(ts_code: str, start_date='20180101', end_date='20181011',
     end_date:   20181011
     adj:        hfq
     '''
-    logger.debug("query_from_tushare")
 
     df: pd.DataFrame = ts.pro_bar(
         ts_code    = ts_code, 
@@ -61,6 +60,8 @@ def query_from_tushare(ts_code: str, start_date='20180101', end_date='20181011',
         'trade_date': 'date',
         'vol': "volume"
     })[STD_COLUMNS]
+
+    df = df.sort_values("date", key=lambda x: pd.to_datetime(x, format=r"%Y%m%d"), ascending=True)
 
     return df
 
@@ -147,3 +148,16 @@ def fetch_or_query(ts_code: str, start_date: str, end_date: str, adj='hfq') -> O
     dump_to_database(df)
 
     return df
+
+
+def download_and_dump2db(ts_code: str, start_date: str, end_date: str, adj='hfq') -> None:
+    '''
+    下载数据 保存到本地中去
+    '''
+    df = query_from_tushare(ts_code, start_date, end_date, adj)
+    
+    if df is None or df.empty:
+        logger.debug("return a None")
+        raise RuntimeError
+    
+    dump_to_database(df)
