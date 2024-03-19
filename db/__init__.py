@@ -16,19 +16,19 @@ with open(TOEKN_PATH, "r") as f:
 
 conn = sqlite3.connect('db/squ-quantstock.db')
 
-cursor = conn.cursor()
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS day_level_hfq (
-        code TEXT,
-        date TEXT,
-        open REAL,
-        high REAL,
-        low REAL,
-        close REAL,
-        volume INTEGER
-    )
-''')
-conn.commit()
+# cursor = conn.cursor()
+# cursor.execute('''
+#     CREATE TABLE IF NOT EXISTS day_level_hfq (
+#         code TEXT,
+#         date TEXT,
+#         open REAL,
+#         high REAL,
+#         low REAL,
+#         close REAL,
+#         volume INTEGER
+#     )
+# ''')
+# conn.commit()
 # conn.close() # TODO: 关闭数据库连接在合适位置
 
 
@@ -36,7 +36,7 @@ conn.commit()
 # 标准化的columns
 STD_COLUMNS = ["code", "date", "open", "high", "low", "close", "volume"]
 
-def query_from_tushare(ts_code: str, start_date='20180101', end_date='20181011', adj='hfq') -> Optional[pd.DataFrame]:
+def query_from_tushare(ts_code: str, start_date: str, end_date: str, adj: str) -> Optional[pd.DataFrame]:
     '''
     ts_code:    000001.SZ
     start_date: 20180101
@@ -66,7 +66,7 @@ def query_from_tushare(ts_code: str, start_date='20180101', end_date='20181011',
     return df
 
 
-def dump_to_database(df: pd.DataFrame) -> None:
+def dump_to_database(df: pd.DataFrame, adj: str) -> None:
 
     # TODO:
     assert all(a == b for (a, b) in zip(df.columns, STD_COLUMNS)), f"{df.columns} != {STD_COLUMNS}"
@@ -77,8 +77,10 @@ def dump_to_database(df: pd.DataFrame) -> None:
 
     # Create a table (if not exists)
     # TEMP: day_level_hfq
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS day_level_hfq (
+    table = f"day_level_{adj}"
+
+    cursor.execute(f'''
+        CREATE TABLE IF NOT EXISTS {table} (
             code TEXT,
             date TEXT,
             open REAL,
@@ -91,8 +93,8 @@ def dump_to_database(df: pd.DataFrame) -> None:
 
     # Insert data into SQLite table
     data = [tuple(row) for row in df.values]
-    cursor.executemany('''
-        INSERT INTO day_level_hfq (code, date, open, high, low, close, volume) 
+    cursor.executemany(f'''
+        INSERT INTO {table} (code, date, open, high, low, close, volume) 
         VALUES (?, ?, ?, ?, ?, ?, ?)
     ''', data)
 
@@ -100,13 +102,15 @@ def dump_to_database(df: pd.DataFrame) -> None:
     conn.commit()
 
 # TODO: 交易日期范围 + 数据库中的数据不足
-def fetch_from_database(ts_code: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+def fetch_from_database(ts_code: str, start_date: str, end_date: str, adj: str) -> Optional[pd.DataFrame]:
     # Connect to SQLite database
     cursor = conn.cursor()
 
+    table = f"day_level_{adj}"
+    
     # Execute a query to fetch data from the database
-    cursor.execute('''
-        SELECT * FROM day_level_hfq 
+    cursor.execute(f'''
+        SELECT * FROM {table} 
         WHERE code = ? AND date BETWEEN ? AND ?
     ''', (ts_code, start_date, end_date))
 
@@ -118,7 +122,7 @@ def fetch_from_database(ts_code: str, start_date: str, end_date: str) -> Optiona
         if data \
         else None 
     
-def fetch_or_query(ts_code: str, start_date: str, end_date: str, adj='hfq') -> Optional[pd.DataFrame]:
+def fetch_or_query(ts_code: str, start_date: str, end_date: str, adj: str) -> Optional[pd.DataFrame]:
     '''
     对外提供的数据库接口, 向数据库查询数据, 如果数据不存在会自动从tushare去获取
     ts_code:    000001.SZ
@@ -127,7 +131,7 @@ def fetch_or_query(ts_code: str, start_date: str, end_date: str, adj='hfq') -> O
     adj:        hfq
     '''
     # Check if data already exists in the database for the specified date range
-    df = fetch_from_database(ts_code, start_date, end_date)
+    df = fetch_from_database(ts_code, start_date, end_date, adj)
     # 数据已有
     if df is not None and not df.empty:
         # 并且无缺失
@@ -145,12 +149,12 @@ def fetch_or_query(ts_code: str, start_date: str, end_date: str, adj='hfq') -> O
         return None
 
     # Dump data to SQLite database
-    dump_to_database(df)
+    dump_to_database(df, adj)
 
     return df
 
 
-def download_and_dump2db(ts_code: str, start_date: str, end_date: str, adj='hfq') -> None:
+def download_and_dump2db(ts_code: str, start_date: str, end_date: str, adj: str) -> None:
     '''
     下载数据 保存到本地中去
     '''
@@ -160,4 +164,4 @@ def download_and_dump2db(ts_code: str, start_date: str, end_date: str, adj='hfq'
         logger.debug("return a None")
         raise RuntimeError
     
-    dump_to_database(df)
+    dump_to_database(df, adj)
