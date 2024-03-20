@@ -102,17 +102,36 @@ def dump_to_database(df: pd.DataFrame, adj: str) -> None:
     conn.commit()
 
 # TODO: 交易日期范围 + 数据库中的数据不足
-def fetch_from_database(ts_code: str, start_date: str, end_date: str, adj: str) -> Optional[pd.DataFrame]:
+def fetch_from_database(ts_code: Union[str, list], start_date: str, end_date: str, adj: str) -> Optional[pd.DataFrame]:
     # Connect to SQLite database
     cursor = conn.cursor()
 
     table = f"day_level_{adj}"
     
     # Execute a query to fetch data from the database
-    cursor.execute(f'''
-        SELECT * FROM {table} 
-        WHERE code = ? AND date BETWEEN ? AND ?
-    ''', (ts_code, start_date, end_date))
+    if type(ts_code) == str:
+        if ts_code != "*":
+            cursor.execute(f'''
+                SELECT * FROM {table} 
+                WHERE code = ? AND date BETWEEN ? AND ?
+            ''', (ts_code, start_date, end_date))
+        else:
+            # query all
+            cursor.execute(f'''
+                SELECT * FROM {table} 
+                WHERE date BETWEEN ? AND ?
+            ''', (start_date, end_date))
+
+    elif type(ts_code) == list:
+        codes = ['\'' + c + '\'' for c in ts_code]
+
+        cursor.execute(f'''
+            SELECT * FROM {table} 
+            WHERE code IN ({",".join(codes)}) AND date BETWEEN ? AND ?
+        ''', (start_date, end_date))
+
+    else:
+        raise TypeError
 
     # Fetch the results
     data = cursor.fetchall()
